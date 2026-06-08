@@ -2,26 +2,26 @@
 tipo: resumo-executivo
 origem: "[[Governança de Dados - Camada MV, DASHs e Agents]]"
 plano: "[[Plano de Engenharia de Dados — Governança MV]]"
-data: 2026-06-07
+data: 2026-06-08
 publico: diretoria
+regra: "Silver é considerado verde (camada modelada e governada). Apenas bronze/externo é vermelho."
 ---
 
 # 📊 Governança de Dados — Resumo Executivo
 
-> **Pergunta:** os dados que alimentam nossas decisões vêm de uma fonte confiável e padronizada?
-> **Padrão-ouro:** métrica → **Metric View** (camada semântica única) · fonte do MV → **gold** (dado tratado).
+> **Pergunta:** os dados que alimentam nossas decisões vêm de uma camada **modelada e governada**?
+> **Padrão:** métrica → **Metric View** · fonte → **gold (ideal)** ou **silver (aceitável)** — o que **não** pode é bronze/planilha.
 
 ---
 
 ## 🎨 O que significa cada cor
 
-| Cor | Camada do dado | O que é | Confiança |
+| Cor | Camada do dado | O que é | Situação |
 |:---:|---|---|---|
-| 🟩 **Verde** | **Gold** (ou Metric View) | Dado **tratado, validado e modelado** — padrão oficial | ✅ Confiável |
-| 🟨 **Amarelo** | **Silver** | Dado **semi-tratado** — serve, mas sem garantia total de qualidade | ⚠️ Aceitável com ressalva |
+| 🟩 **Verde** | **Gold, Silver ou Metric View** | Dado **modelado e governado** (gold = ideal · silver = tratado/aceitável) | ✅ OK |
 | 🟥 **Vermelho** | **Bronze** ou fonte externa | Dado **cru / planilha** — sem tratamento, risco de erro e divergência | ❌ Ação necessária |
 
-> As barras abaixo mostram **quanto de cada cor** existe em cada avenida. Quanto mais verde, mais saudável.
+> **Mudança de régua:** o **silver agora conta como verde**. Silver é uma camada já modelada — o problema de governança real é o consumo de **bronze/externo**. As barras abaixo mostram quanto de cada avenida já está em camada governada (🟩) vs. dado cru (🟥).
 
 ---
 
@@ -29,127 +29,118 @@ publico: diretoria
 
 | Avenida | 📐 Metric Views | 🤖 Agentes | 📈 Dashboards | Geral |
 |---|:---:|:---:|:---:|:---:|
-| 🛒 **CRMBACK** | 🟩 Ideal | 🟩 Ideal | — | 🟩 **Referência** |
-| 📢 **ADS** | 🟧 Moderado | 🟥 Sem Genie | 🟥 Crítico | 🟧 **Atenção** |
-| 🎫 **ValeBonus** | 🟧 Moderado | 🟧 Moderado | 🟥 Crítico | 🟥 **Crítico** |
-| 🎁 **Giftback** | 🟨 Atenção | 🟢 Bom | 🟥 Crítico | 🟨 **Atenção** |
-| 🎀 **Presenteia** | 🟥 Crítico | 🟨 Atenção | — | 🟥 **Crítico** |
+| 🛒 **CRMBACK** | 🟩 100% | 🟩 100% | — | 🟩 **Referência** |
+| 🎁 **Giftback** | 🟩 90% | 🟩 100% (Clara) | 🟧 55% | 🟢 **Bom** (dashs a migrar) |
+| 🎫 **ValeBonus** | 🟩 80% | 🟧 Ifood crítico | 🟩 73% | 🟧 **Moderado** |
+| 📢 **ADS** | 🟩 80% | 🟥 Sem Genie | 🟧 60% | 🟧 **Atenção** |
+| 🎀 **Presenteia** | 🟥 0% (100% bronze) | 🟩 100% (Orion) | — | 🟥 **Crítico (MVs)** |
+
+> Com a nova régua, **a maioria das avenidas já está majoritariamente em verde**. Os focos vermelhos se concentram em poucos pontos claros (detalhados abaixo).
 
 ---
 
-## 1️⃣ Metric Views — % de fonte Gold / Silver / Bronze
+## 1️⃣ Metric Views — % em camada governada vs bronze
 
-**38 Metric Views · só 24% têm fonte 100% confiável (gold)**
+**38 Metric Views · 53% já em camada governada (gold+silver) · 47% ainda em bronze**
 
-| Avenida | Distribuição da fonte | 🟩 Gold | 🟨 Silver | 🟥 Bronze |
-|---|---|:---:|:---:|:---:|
-| 🛒 CRMBACK | 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩 | **100%** | 0% | 0% |
-| 📢 ADS | 🟩🟩🟩🟩🟩🟩🟨🟨🟥🟥 | **60%** | 20% | 20% |
-| 🎫 ValeBonus | 🟩🟩🟩🟩🟩🟩🟨🟨🟥🟥 | **60%** | 20% | 20% |
-| 🎁 Giftback | 🟨🟨🟨🟨🟨🟨🟨🟨🟨🟥 | **0%** | 90% | 10% |
-| 🎀 Presenteia | 🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥 | **0%** | 0% | 100% |
-| **TOTAL** | 🟩🟩🟨🟨🟨🟥🟥🟥🟥🟥 | **24%** | 29% | 47% |
+| Avenida | Distribuição (🟩 governado → 🟥 bronze) | 🟩 Verde | 🟥 Bronze |
+|---|---|:---:|:---:|
+| 🛒 CRMBACK | 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩 | **100%** | 0% |
+| 🎁 Giftback | 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟥 | **90%** | 10% |
+| 📢 ADS | 🟩🟩🟩🟩🟩🟩🟩🟩🟥🟥 | **80%** | 20% |
+| 🎫 ValeBonus | 🟩🟩🟩🟩🟩🟩🟩🟩🟥🟥 | **80%** | 20% |
+| 🎀 Presenteia | 🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥 | **0%** | 100% |
+| **TOTAL** | 🟩🟩🟩🟩🟩🟥🟥🟥🟥🟥 | **53%** | 47% |
 
-**📌 Leitura:** a camada semântica existe, mas **47% dos Metric Views ainda bebem de dado cru (bronze)**. Presenteia (100% bronze) e Giftback (90% silver, 0% gold) são os pontos frágeis.
+> Do verde total (20 MVs): 9 em **gold** (ideal) e 11 em **silver** (aceitável).
+
+**📌 Leitura:** quase todas as avenidas já têm MVs em camada governada. O vermelho é **quase todo Presenteia** (15 MVs, 100% bronze) — é onde está concentrado o esforço.
 
 ---
 
-## 2️⃣ Agentes (Genies) — Governança + % que realmente usa Metric View
+## 2️⃣ Agentes (Genies) — % em camada governada + % via Metric View
 
-**O agente deveria responder sempre a partir do Metric View. Onde isso não acontece, ele busca dado cru.**
-
-| Genie | Avenida | Distribuição | 🟩 Verde | 🟨 / 🟥 | **% via Metric View** |
+| Genie | Avenida | Distribuição | 🟩 Verde | 🟥 Vermelho | **% via Metric View** |
 |---|---|---|:---:|:---:|:---:|
 | CRMBACK Analysis | 🛒 CRMBACK | 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩 | 100% | 0% | **75%** |
-| Clara | 🎁 Giftback | 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟨 | 89% | 🟨 11% | **89%** |
-| VB Insights | 🎫 ValeBonus | 🟩🟩🟩🟩🟩🟩🟩🟨🟥 | 71% | 🟨 14% · 🟥 14% | **43%** |
-| Orion | 🎀 Presenteia | 🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨 | 0% | 🟨 100% | **0%** |
+| Clara | 🎁 Giftback | 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩 | 100% | 0% | **89%** |
+| Orion | 🎀 Presenteia | 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩 | 100% | 0% | **0%** (usa silver) |
+| VB Insights | 🎫 ValeBonus | 🟩🟩🟩🟩🟩🟩🟩🟩🟥 | 86% | 🟥 14% | **43%** |
 | Ifood Embedded | 🎫 ValeBonus | 🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥 | 0% | 🟥 100% | **0%** |
 | — ausente — | 📢 **ADS** | — | — | — | **sem agente** |
 
-**📌 Leitura:** quem usa Metric View tem a melhor governança (Clara 89%, CRMBACK 75%). **Orion e Ifood Embedded usam 0% de Metric View** — e no caso do Ifood, **o Metric View certo já existe e está sendo ignorado** (só reconfigurar). ADS, a maior avenida, **não tem agente**.
+**📌 Leitura:** com silver valendo como verde, **4 dos 5 agentes estão verdes** (o Orion sobe de "atenção" para 100% — ele usa silver, que agora é aceitável). Restam **2 focos**: o **Ifood Embedded** (usa staging não-governado, mesmo havendo MV pronto) e a **ausência de Genie no ADS**.
 
 ---
 
-## 3️⃣ Dashboards — % de fonte Gold/MV vs Silver vs Bronze
+## 3️⃣ Dashboards — % em camada governada vs bronze/planilha
 
-**15 dashboards · a maioria puxa dado cru e planilha direto, contornando a camada oficial**
+**15 dashboards · ainda é onde mais se consome dado cru**
 
-| Avenida | Distribuição da fonte | 🟩 Gold/MV | 🟨 Silver | 🟥 Bronze/externo |
-|---|---|:---:|:---:|:---:|
-| 📢 ADS (6 dashs) | 🟩🟩🟩🟩🟩🟨🟥🟥🟥🟥 | **52%** | 8% | 40% |
-| 🎫 ValeBonus (5 dashs) | 🟩🟩🟩🟩🟩🟨🟨🟥🟥🟥 | **50%** | 23% | 27% |
-| 🎁 Giftback (4 dashs) | 🟩🟩🟩🟨🟨🟨🟥🟥🟥🟥 | **27%** | 27% | 45% |
+| Avenida | Distribuição (🟩 governado → 🟥 bronze/ext) | 🟩 Verde | 🟥 Bronze/externo |
+|---|---|:---:|:---:|
+| 🎫 ValeBonus (5 dashs) | 🟩🟩🟩🟩🟩🟩🟩🟥🟥🟥 | **73%** | 27% |
+| 📢 ADS (6 dashs) | 🟩🟩🟩🟩🟩🟩🟥🟥🟥🟥 | **60%** | 40% |
+| 🎁 Giftback (4 dashs) | 🟩🟩🟩🟩🟩🟩🟥🟥🟥🟥 | **55%** | 45% |
 
-> ⚠️ **Atenção:** mesmo o "verde" dos dashboards é, em grande parte, **tabela gold consumida direto — não o Metric View**. Ou seja, a adoção real da camada semântica nos dashboards é ainda menor que o verde sugere.
+> ⚠️ Mesmo o verde aqui é, em boa parte, **tabela consumida direto (gold/silver) — não o Metric View**. A adoção da camada semântica nos dashboards segue sendo um ponto a evoluir.
 
-**📌 Leitura:** é o ponto **mais crítico**. Dashboards de negócio consomem bronze/planilha diretamente (Giftback 45%, ADS 40%), criando risco de **números divergentes** entre relatórios e a fonte oficial.
+**📌 Leitura:** os dashboards continuam sendo o ponto **mais vermelho** — Giftback (45%) e ADS (40%) ainda puxam bronze/planilha. Aqui o ganho vem de **trocar o bronze pela silver/gold equivalente** (a maior parte já existe).
 
 ---
 
 ## 4️⃣ Tabelas Críticas — candidatas a documentação + monitoramento
 
-> Estas são as tabelas **mais reutilizadas** em todo o ecossistema (somando dashboards + Metric Views + agentes). São a "visão de dados" que mais chega ao cliente — logo, **as que mais valem documentação caprichada e monitoramento de qualidade**. Quanto mais consumidores, maior o "raio de impacto" se a tabela falhar.
+> As tabelas **mais reutilizadas** no ecossistema (dashboards + MVs + agentes) — a "visão de dados" que mais chega ao cliente. Independente da camada, merecem documentação e monitoramento. As 🟥 bronze são também as que precisam de saneamento.
 
-### 🥇 Núcleo central — usadas pelos 3 tipos de consumidor (dash + MV + agente)
-
-| Tabela | Camada | 📈 Dash | 📐 MV | 🤖 Agente | **Total** | Risco |
+| Tabela | Camada | 📈 Dash | 📐 MV | 🤖 Agente | **Total** | Nota |
 |---|:---:|:---:|:---:|:---:|:---:|---|
-| `silver.giftback.bonus` | 🟨 Silver | 11 | 11 | 1 | **23** | 🔴 **a mais usada de todas** — e ainda é silver |
-| `gold.valebonus.emissions` | 🟩 Gold | 4 | 1 | 1 | **6** | ✅ já é gold — só documentar/monitorar |
-| `gold.valebonus.transactions_shops` | 🟩 Gold | 2 | 2 | 1 | **5** | ✅ já é gold |
-| `silver.valebonus.usuarios` | 🟨 Silver | 3 | 1 | 1 | **5** | 🟡 promover a gold |
-
-### 🥈 Espinha dorsal — usadas por 2 tipos, alto volume
-
-| Tabela | Camada | 📈 Dash | 📐 MV | 🤖 Agente | **Total** | Risco |
-|---|:---:|:---:|:---:|:---:|:---:|---|
+| `silver.giftback.bonus` | 🟩 Silver | 11 | 11 | 1 | **23** | ✅ governada — **a mais usada de todas**, monitorar a fundo |
+| `bronze.giftback.bonus` | 🟥 Bronze | 6 | 2 | — | **8** | 🔴 trocar pela silver acima |
 | `gold.ads.b2b_bonification` | 🟩 Gold | 5 | 3 | — | **8** | ✅ núcleo ADS |
-| `bronze.giftback.bonus` | 🟥 Bronze | 6 | 2 | — | **8** | 🔴 dado cru muito consumido |
-| `silver.giftback.masters` | 🟨 Silver | 3 | 5 | — | **8** | 🟡 promover a gold |
+| `silver.giftback.masters` | 🟩 Silver | 3 | 5 | — | **8** | ✅ governada |
 | `gold.ads.b2b_message` | 🟩 Gold | 6 | 1 | — | **7** | ✅ núcleo ADS |
 | `gold.ads.b2b_offer` | 🟩 Gold | 5 | 2 | — | **7** | ✅ núcleo ADS |
-| `bronze.giftback.orders` | 🟥 Bronze | 6 | 1 | — | **7** | 🔴 dado cru muito consumido |
-| `bronze.giftback.brands` | 🟥 Bronze | 5 | 1 | — | **6** | 🔴 cadastro de marcas cru |
-| `silver.giftback.vendas_totais` | 🟨 Silver | 2 | 4 | — | **6** | 🟡 promover a gold |
+| `bronze.giftback.orders` | 🟥 Bronze | 6 | 1 | — | **7** | 🔴 remodelar |
+| `silver.giftback.vendas_totais` | 🟩 Silver | 2 | 4 | — | **6** | ✅ governada |
+| `bronze.giftback.brands` | 🟥 Bronze | 5 | 1 | — | **6** | 🔴 remodelar (cadastro de marcas) |
 | `gold.ads.cpl_cpi_cpa` | 🟩 Gold | 4 | 1 | — | **5** | ✅ parâmetros de receita |
+| `silver.valebonus.usuarios` | 🟩 Silver | 3 | 1 | 1 | **5** | ✅ governada |
+| `bronze.presenteia.user_events` | 🟥 Bronze | — | 5 | — | **5** | 🔴 trocar por `silver.presenteia.tb_eventos` |
+| `bronze.presenteia.orders` | 🟥 Bronze | — | 4 | — | **4** | 🔴 trocar por `silver.presenteia.tb_pedidos` |
 
-### 🎀 Núcleo Presenteia — base de muitos MVs (avenida 100% bronze)
+**📌 Leitura:** as tabelas mais usadas já são, em boa parte, **verdes (gold/silver)** — boa notícia. As 🟥 bronze recorrentes (`giftback.bonus/orders/brands`, núcleo `presenteia`) são as que faltam sanear, e na maioria **já têm uma silver equivalente para trocar**.
 
-| Tabela | Camada | 📈 Dash | 📐 MV | 🤖 Agente | **Total** | Risco |
-|---|:---:|:---:|:---:|:---:|:---:|---|
-| `bronze.presenteia.user_events` | 🟥 Bronze | — | 5 | — | **5** | 🔴 base de 5 MVs |
-| `bronze.presenteia.orders` | 🟥 Bronze | — | 4 | — | **4** | 🔴 base de 4 MVs |
-| `bronze.presenteia.users` | 🟥 Bronze | — | 3 | — | **3** | 🔴 base de 3 MVs |
-
-**📌 Leitura:** **`silver.giftback.bonus` é, isolada, a tabela mais crítica do ecossistema** — alimenta 11 dashboards, ~todos os Metric Views de Giftback e o agente Clara. Um erro nela impacta quase toda a avenida. E há um padrão preocupante: **boa parte das tabelas mais usadas ainda é silver ou bronze** (raio de impacto alto + confiança baixa) — exatamente as que mais precisam de documentação e monitoramento **agora**.
-
-> 💡 **Recomendação:** definir um **grupo "tabelas críticas / golden tables"** (as ~12 acima) com: dono nomeado, dicionário de dados documentado, contrato de dados (schema + SLA de atualização) e **monitoramento de qualidade/frescor**. Priorizar as 🔴 silver/bronze — são as mais usadas e as menos confiáveis.
+> 💡 **Recomendação:** definir um grupo de **"golden tables"** (as ~13 acima) com dono nomeado, dicionário de dados, contrato (schema + SLA de frescor) e **monitoramento de qualidade** — incluindo as silver mais usadas, que agora são camada oficial.
 
 ---
 
 ## 🎯 A Mensagem Central
 
-> A **camada semântica (Metric Views) já existe** e cobre as métricas. O problema **não é falta de modelo** — é que **47% dos MVs ainda têm fonte de dado cru** e dashboards/agentes **contornam o modelo** indo direto à fonte.
+> Com o **silver reconhecido como camada governada**, o cenário é mais saudável do que parecia: **a maioria das métricas, agentes e dashboards já está em verde**.
 >
-> **80% da solução está numa única frente: a Engenharia tratar as tabelas-base (bronze/silver → gold).** Isso conserta Metric Views, dashboards e agentes de uma vez.
+> O problema de governança se **isola no consumo de bronze**, concentrado em pontos claros:
+> - 🎀 **Presenteia** — os 15 MVs leem bronze direto (e a silver equivalente já existe para a maioria);
+> - 📈 **Dashboards** Giftback/ADS — 40–45% ainda em bronze/planilha;
+> - 🎫 **Ifood Embedded** — agente usa staging não-governado, ignorando o MV pronto.
+>
+> **O trabalho deixou de ser "promover silver para gold" e passou a ser "tirar o bronze do caminho"** — na maioria dos casos, apenas **trocar o bronze pela silver que já existe**.
 
 ---
 
-## ✅ Plano de Ação — 4 frentes
+## ✅ Plano de Ação — foco no que ainda é vermelho
 
 | Frente | O que é | Onde dói mais |
 |---|---|---|
-| **A — Tratar tabelas-base** | bronze/silver → gold | 🎀 Presenteia (100% bronze) e 🎁 Giftback (90% silver) |
-| **B — Materializar views** | views que escondem dado cru | 🎁 Giftback |
-| **C — Criar métricas faltantes** | tabelas gold ainda sem Metric View | 📢 ADS, 🎫 ValeBonus |
-| **D — Reapontar consumo** | dashs/agentes → usar o Metric View | todas |
+| **A — Sanear bronze** | trocar bronze pela silver existente; remodelar onde não há | 🎀 Presenteia (MVs) e 📈 dashs Giftback/ADS |
+| **D — Reapontar consumo** | dashs/agentes → usar MV/silver/gold | Ifood, dashs em geral |
+| **C — Criar métricas faltantes** | tabelas sem Metric View | 📢 ADS, 🎫 ValeBonus |
 
 ### 🚀 3 vitórias rápidas (alto impacto, baixo esforço)
-1. **Reconfigurar o agente Ifood Embedded** → usar o Metric View que já existe _(0% → 100% MV, custo ~zero)_.
-2. **Criar o Genie de ADS** → fecha o único vazio de cobertura por avenida (5 MVs já prontos).
-3. **Tratar 2 tabelas de Giftback** (`bonus` + `masters`) → conserta **9 dos 10 Metric Views** da avenida de uma só vez (0% → ~90% gold).
+1. **Reconfigurar o agente Ifood Embedded** → usar o Metric View que já existe _(0% → 100% verde, custo ~zero)_.
+2. **Criar o Genie de ADS** → fecha o único vazio de cobertura por avenida (5 MVs prontos).
+3. **Trocar o bronze do Presenteia pelas silver `tb_*` que já existem** → tira ~8 MVs do vermelho **sem precisar modelar nada novo** (a silver já está pronta e governada).
 
 ---
 
-_Detalhamento técnico em [[Plano de Engenharia de Dados — Governança MV]] · base de investigação em [[Governança de Dados - Camada MV, DASHs e Agents]]._
+_Detalhamento técnico em [[Plano de Engenharia de Dados — Governança MV]] · tabelas silver em uso em [[Mapa de Tabelas Silver em Uso]] · base de investigação em [[Governança de Dados - Camada MV, DASHs e Agents]]._
