@@ -23,10 +23,10 @@ estado_alvo: "Toda métrica via Metric View; todo dado não-métrico via tabela 
 | **Genies (Agents)** | 5 genies | 2 ideais | 2 atenção | 1 crítico | 🟠 Moderado |
 
 ### Diagnóstico em uma frase
-A camada semântica (MVs) existe e cobre boa parte das métricas, mas **18 dos 38 MVs ainda bebem de bronze/silver** e **a maioria dos dashboards e parte dos Genies contorna os MVs** consumindo tabelas cruas. O gargalo está majoritariamente na **modelagem de tabelas gold** (Eixo A) — resolvê-lo destrava MVs, dashboards e Genies de uma vez.
+A camada semântica (MVs) existe e cobre boa parte das métricas, mas **18 dos 38 MVs ainda bebem de bronze/silver** e **a maioria dos dashboards e parte dos Genies contorna os MVs** consumindo tabelas cruas. O gargalo está majoritariamente nas **tabelas bronze consumidas direto** (Eixo A) — saneá-las destrava MVs, dashboards e Genies de uma vez.
 
 ### Os 4 eixos de trabalho
-- **Eixo A — Modelagem de Tabelas** (bronze/silver → gold): a raiz do problema.
+- **Eixo A — Saneamento de tabelas bronze** (verificar → trocar por silver existente ou remodelar): a raiz do problema.
 - **Eixo B — Materialização de Views gold** (`vw_*` que escondem silver/bronze).
 - **Eixo C — Métricas a criar** (novos Metric Views para tabelas gold hoje sem MV).
 - **Eixo D — Reconfiguração de Consumo** (apontar Dashs/Genies para os MVs).
@@ -36,64 +36,101 @@ A camada semântica (MVs) existe e cobre boa parte das métricas, mas **18 dos 3
 | Avenida | Hoje | Maior alavanca | Estado-alvo |
 |---|---|---|---|
 | 🛒 CRMBACK | ✅ Ideal (3/3 MVs gold) | — (referência) | Manter; unificar consumo no MV |
-| 📢 ADS | 🟠 Moderado (3✅/1🟡/1🔴) | Promover bronze.giftback + criar Genie | 5 MVs gold + Genie ADS |
-| 🎫 ValeBonus | 🟠 Moderado MVs / 🔴 dashs | Promover bronze.valebonus | MVs gold + Genies só-MV |
-| 🎁 Giftback | 🟡 Atenção (0✅/9🟡/1🔴) | Promover silver.giftback.{bonus,masters} | 10 MVs gold |
-| 🎀 Presenteia | 🔴 Crítico (15/15 bronze) | Criar camada gold presenteia | 15 MVs gold + Orion sobe p/ gold |
+| 📢 ADS | 🟠 Moderado (3✅/1🟡/1🔴) | Sanear bronze.giftback (motor ADS) + criar Genie | 5 MVs gold + Genie ADS |
+| 🎫 ValeBonus | 🟠 Moderado MVs / 🔴 dashs | Sanear bronze.valebonus (trocar/remodelar) | MVs gold + Genies só-MV |
+| 🎁 Giftback | 🟡 Atenção (0✅/9🟡/1🔴) | Trocar bronze.giftback.{bonus,masters} → silver | 10 MVs gold |
+| 🎀 Presenteia | 🔴 Crítico (15/15 bronze) | Trocar bronze.presenteia.* → silver `tb_*` existentes | 15 MVs gold + Orion sobe p/ gold |
 
 ---
 
-## 2. Eixo A — Modelagem de Tabelas (bronze/silver → gold)
+## 2. Eixo A — Saneamento das Tabelas Bronze
 
-> **Raiz da governança.** Ordenado por nº de consumidores (MVs + dashboards + Genies) desbloqueados. Cada item é uma tabela a **promover/modelar em gold**.
+> **Nova abordagem (raiz da governança).** Nenhum Metric View, agente ou dashboard deve consumir **bronze**. Para **cada tabela bronze** consumida hoje, o processo é:
+>
+> 1. **Mapear** quem consome (MV / agente / dashboard) — já feito no inventário abaixo.
+> 2. **Verificar no Unity Catalog** se já existe uma tabela **silver equivalente**.
+> 3. **Se existe** → validar a equivalência de schema/grão e **trocar o consumo para a silver** (e avaliar promovê-la a gold em seguida).
+> 4. **Se não existe** → **entender o uso real** (campos, grão, regra de negócio) e **remodelar** (criar a silver/gold adequada).
+>
+> ⚠️ A coluna **"Silver candidata"** no inventário é uma **hipótese por correspondência de nome**, a confirmar no catálogo — ✅ = silver já existe no doc · ❓ = provável, validar · — = não há.
 
-- [ ] **A1 · 🔴 P0 · `silver.giftback.bonus` → gold** _(maior alavanca Giftback)_
-  Promover a tabela gold modelada (ou MV de base). **Destrava:** `mv_bonus_gerado_marca`, `mv_bonus_perdido_marca`, `mv_bonus_resgate_marca`, `mv_engajamento_marca` + 5 MVs via views + dashboards GB (natura, vivara, cs_giftback, cs_acoes) + escape do Genie Clara. **Impacto: 6+ MVs, 4 dashs, 1 Genie.**
+### A1 · 🔴 P0 · Inventário e verificação no Unity Catalog
+- [ ] **A1** — Para cada tabela do inventário (final desta seção), rodar `DESCRIBE EXTENDED` / `SHOW TABLES IN silver.<schema>` e confirmar: (a) existe silver equivalente? (b) schema/grão batem? Registrar a decisão final (Trocar / Confirmar / Remodelar). **É o passo que destrava todos os demais.**
 
-- [ ] **A2 · 🔴 P0 · `silver.giftback.masters` → gold**
-  Promover a gold. **Destrava:** `mv_bonus_gerado_master`, `mv_bonus_resgate_master`, `mv_engajamento_master` + views correlatas. **Impacto: 5+ MVs.** _(A1+A2 juntas resolvem 9 dos 10 MVs de Giftback.)_
+### A2 · 🟢 Trocar para silver existente (equivalência provável)
+> Silver já existe no catálogo; ação = validar e redirecionar o consumo do bronze para a silver.
+- [ ] **A2.1 · 🔴 P0 · `bronze.giftback.bonus` → `silver.giftback.bonus`** — maior alavanca. Consumida por `mv_ads_receita_ads`, `mv_bonus_perdido_master` (via `vw_bonus_var_perdido`) e 6 dashboards (ADS Monitoramento/Sem Parar/ARM + GB natura/vivara/cs_acoes). A silver já alimenta outros MVs Giftback → equivalência alta.
+- [ ] **A2.2 · 🔴 P0 · `bronze.giftback.masters` → `silver.giftback.masters`** — dash GB cs_giftback. Silver já consumida pelos MVs *master*.
+- [ ] **A2.3 · 🟡 P1 · `bronze.giftback.total_sales` → `silver.giftback.vendas_totais`** — dashs GB natura/cs_giftback. Validar se `vendas_totais` cobre `total_sales`.
+- [ ] **A2.4 · 🔴 P0 · `bronze.presenteia.orders` → `silver.presenteia.tb_pedidos`** — base de 4 MVs (`mv_pedidos`, `mv_pedidos_2`, `mv_take_rate`, `mv_lembretes_enviados`). Orion já usa `tb_pedidos`.
+- [ ] **A2.5 · 🔴 P0 · `bronze.presenteia.users` → `silver.presenteia.tb_usuarios`** — base de 3 MVs (`mv_usuarios`, `mv_contatos`, `mv_lembretes_enviados`). Orion já usa `tb_usuarios`.
+- [ ] **A2.6 · 🔴 P0 · `bronze.presenteia.user_events` → `silver.presenteia.tb_eventos`** — base de **5 MVs** (maior nº do Presenteia). Orion já usa `tb_eventos`.
 
-- [ ] **A3 · 🔴 P0 · `bronze.giftback.bonus` → gold**
-  Promover. É a **única fonte bronze** na cadeia do `mv_bonus_perdido_master` (via `vw_bonus_var_perdido`) e também alimenta `mv_ads_receita_ads`. **Impacto: 2 MVs, Genie Clara.**
+### A3 · 🟡 Confirmar equivalência incerta, depois trocar
+> Há silver com nome/domínio próximo, mas a equivalência precisa ser validada campo a campo. Se não bater, cai para remodelagem (A4).
+- [ ] **A3.1 · 🟡 P1 · `bronze.giftback.customer_masters` → `silver.giftback.masters`?** — confirmar se `masters` cobre `customer_masters` (dash cs_giftback).
+- [ ] **A3.2 · 🟡 P1 · `bronze.presenteia.user_contacts` → `silver.presenteia.tb_conversas`/`tb_entradas`?** — base de 3 MVs (`mv_contatos`, `mv_kids`, `mv_lembretes_enviados`). Identificar qual silver corresponde; senão, remodelar.
+- [ ] **A3.3 · 🟡 P1 · `bronze.valebonus.pre_charge_transaction` → `silver.valebonus.transactions`?** — fonte bronze mais recorrente dos dashs Vivo (3 dashboards). Alto impacto — validar equivalência.
+- [ ] **A3.4 · 🟡 P2 · `bronze.valebonus.redemptions` → `silver.valebonus.transactions`?** — base de `mv_resgate_ifood_embedded` + dash Ifood. Confirmar se `transactions` cobre `redemptions`.
+- [ ] **A3.5 · 🟡 P2 · `bronze.valebonus.{users, consumer, device, session}` → `silver.valebonus.usuarios`?** — perfil de usuário VB (dashs parceiros_interno, Ifood). Confirmar cobertura de `usuarios`; o que faltar, remodelar.
+- [ ] **A3.6 · 🟡 P2 · `bronze.zendesk.organizations` → `silver.zendesk.*`** — `silver.zendesk.users` e `silver.zendesk.tickets` já existem; falta `silver.zendesk.organizations`. Base do `mv_atendimentos`. Criar a silver que falta para completar o domínio.
 
-- [ ] **A4 · 🔴 P0 · `bronze.presenteia.orders` → `gold.presenteia.orders`**
-  Modelar tabela gold. **Destrava:** `mv_pedidos`, `mv_pedidos_2`, `mv_take_rate`, `mv_lembretes_enviados` + Genie Orion. **Impacto: 4+ MVs, 1 Genie.**
+### A4 · 🔴 Remodelar — sem silver hoje (entender uso e criar)
+> Não há silver equivalente. Entender o uso real e criar a camada silver/gold. Agrupado por domínio.
+- [ ] **A4.1 · 🔴 P1 · Domínio motor de ofertas ADS (Giftback)** — `brands`, `ads_activities`, `ads_offers`, `ads_publisher_squares`, `bonus_b2b_campaigns`, `bonus_b2b_logs`, `prebonus`, `prebonus_file`. Consumidas por `mv_ads_receita_ads` (`brands`) e dashs ADS (Acompanhamento Motor, Monitoramento, Sem Parar, ARM, quartou). Modelar dims/fatos do motor ADS.
+- [ ] **A4.2 · 🔴 P2 · Domínio cadastro Giftback** — `customers`, `customer_configs`, `customer_users`, `orders`, `sms_mgms`. Dashs GB (natura, vivara, cs_acoes, quartou). Modelar `dim_customers`, `dim_customer_users`, fato `orders`/MGM.
+- [ ] **A4.3 · 🔴 P2 · Domínio Becon / WhatsApp (ADS Sem Parar)** — `bronze.becon.{w_message, w_message_error, w_message_label, w_company_contact, w_company_label, w_company_chat_flow_message, w_company_chat_flow_session}` (7 tabelas). Sem silver. Entender uso no dash Sem Parar e modelar.
+- [ ] **A4.4 · 🟡 P2 · Domínio Presenteia (entidades sem silver)** — `user_checkins`, `user_addresses`, `user_event_sends`, `invite_sends`, `meta_phone_numbers`, `meta_template_analytics`. Base de `mv_contatos`, `mv_enderecos`, `mv_lembretes_enviados`, `mv_convites`, `mv_numeros`, `mv_custo_meta`. Modelar silver/gold.
+- [ ] **A4.5 · 🔴 P1 · Domínio ValeBonus (sem silver)** — `applications` (Genie VB Insights + dash parceiros), `campaign`, `offer`, `cellphone`, `wallet_balances`, `wallet_transaction`. Dashs VB vivo, parceiros, Ifood, vivo_acompanhamento. Modelar dims/fatos silver/gold.
 
-- [ ] **A5 · 🔴 P0 · `bronze.presenteia.user_events` → `gold.presenteia.user_events`**
-  Modelar gold. **Destrava:** `mv_lembretes_criados`, `mv_lembretes_criados_2`, `mv_usuario_com_engajamento`, `mv_contatos`. **Impacto: 4 MVs.**
+### A5 · 🟥 Caso especial — staging não governado
+- [ ] **A5 · 🔴 P0 · `datalab.valebonus.prd_ifood_embeded_resgates`** — não é bronze, é **staging (datalab)** consumido pelo Genie Ifood Embedded. O MV `gold.valebonus.mv_resgate_ifood_embedded` **já existe** → não remodelar, apenas **reapontar o Genie** (ver **D1**).
 
-- [ ] **A6 · 🟡 P1 · `bronze.presenteia.users` → `gold.presenteia.users`**
-  Modelar gold. **Destrava:** `mv_usuarios`, `mv_contatos`, `mv_lembretes_enviados`. **Impacto: 3 MVs, Genie Orion.**
-
-- [ ] **A7 · 🟡 P1 · `bronze.presenteia.user_contacts` → `gold.presenteia.user_contacts`**
-  Modelar gold. **Destrava:** `mv_kids`, `mv_contatos`, `mv_lembretes_enviados`. **Impacto: 3 MVs.**
-
-- [ ] **A8 · 🟡 P1 · `silver.giftback.vendas_totais` → gold**
-  Promover. **Destrava:** `mv_bonus_vendatotal_marca`, `mv_engajamento_marca`, `mv_engajamento_master` + dashboards GB (`fvendas`). **Impacto: 3 MVs.**
-
-- [ ] **A9 · 🔴 P1 · `bronze.valebonus.pre_charge_transaction` → gold**
-  Modelar gold. Fonte bronze mais recorrente nos dashboards Vivo (`fEmissao`, `fResgates_*`, `fMailing`, `fPreCharge`). **Impacto: dashs VB vivo + vivo_acompanhamento (núcleo do scorecard 🔴).**
-
-- [ ] **A10 · 🔴 P1 · `bronze.valebonus.applications` → gold (ou MV)**
-  Modelar. Usada pelo Genie VB Insights (consulta direta a bronze) e dashboards `dEmissor`. **Impacto: 1 Genie, dashs VB.**
-
-- [ ] **A11 · 🟡 P1 · `bronze.valebonus.redemptions` → `gold.valebonus.redemptions`**
-  Modelar gold. **Destrava:** `mv_resgate_ifood_embedded` (hoje 🔴 por bronze + silver.giftback.bonus). **Impacto: 1 MV, Genie Ifood Embedded.**
-
-- [ ] **A12 · 🟡 P2 · `silver.valebonus.usuarios` → gold**
-  Promover. **Destrava:** `mv_valebonus_cadastro` (sobe 🟡→✅) + dashs VB (`fUser`, `fResgate_perfil`). **Impacto: 1 MV, dashs VB, Genie VB Insights.**
-
-- [ ] **A13 · 🟡 P2 · Demais bronze ValeBonus → gold**
-  `consumer`, `device`, `session`, `cellphone`, `campaign`, `offer`, `wallet_transaction`, `pre_charge_transaction` (cobertos em A9). Modelar dims/fatos gold para zerar bronze nos dashs `parceiros_interno`, `vale_bonus_parceiros`, `vivo`. **Impacto: dashs VB.**
-
-- [ ] **A14 · 🟡 P2 · Camada gold Zendesk (`bronze.zendesk.*` + `silver.zendesk.*`)**
-  Modelar gold para atendimento. **Destrava:** `mv_atendimentos` (Presenteia). **Impacto: 1 MV.**
-
-- [ ] **A15 · 🔴 P2 · Bronze Giftback de dashboards → gold/dims**
-  `customers`, `customer_configs`, `customer_users`, `orders`, `total_sales`, `sms_mgms`, `ads_activities`, `ads_offers`, `brands`. Criar dims/fatos gold (`dim_customers`, `dim_customer_users`, `gold.giftback.orders`, `dim_brands`). **Destrava:** dashs GB (natura, vivara) + ADS (Acompanhamento Motor, Gerencial). **Impacto: dashs ADS+GB.**
-
-- [ ] **A16 · 🟡 P2 · `silver.ext_bases.vivo_vale_bonus_usuarios_extras`**
-  Avaliar promoção/governança da base externa Vivo. Usada nos dashs `vivo_acompanhamento_de_meta`. **Impacto: dashs VB Vivo.**
+### 📋 Inventário das tabelas bronze (base da verificação)
+| Tabela bronze | Consumidores | Silver candidata | Decisão inicial |
+|---|---|---|---|
+| `bronze.giftback.bonus` | 2 MV · 6 dash | `silver.giftback.bonus` ✅ | 🟢 Trocar (A2.1) |
+| `bronze.giftback.masters` | 1 dash | `silver.giftback.masters` ✅ | 🟢 Trocar (A2.2) |
+| `bronze.giftback.total_sales` | 2 dash | `silver.giftback.vendas_totais` ✅ | 🟢 Trocar (A2.3) |
+| `bronze.giftback.customer_masters` | 1 dash | `silver.giftback.masters` ❓ | 🟡 Confirmar (A3.1) |
+| `bronze.giftback.brands` | 1 MV · 5 dash | — | 🔴 Remodelar (A4.1) |
+| `bronze.giftback.orders` | 1 MV · 6 dash | — | 🔴 Remodelar (A4.2) |
+| `bronze.giftback.customers` | 3 dash | — | 🔴 Remodelar (A4.2) |
+| `bronze.giftback.customer_configs` | 1 dash | — | 🔴 Remodelar (A4.2) |
+| `bronze.giftback.customer_users` | 1 dash | — | 🔴 Remodelar (A4.2) |
+| `bronze.giftback.sms_mgms` | 1 dash | — | 🔴 Remodelar (A4.2) |
+| `bronze.giftback.ads_activities` | 2 dash | — | 🔴 Remodelar (A4.1) |
+| `bronze.giftback.ads_offers` | 2 dash | — | 🔴 Remodelar (A4.1) |
+| `bronze.giftback.ads_publisher_squares` | 1 dash | — | 🔴 Remodelar (A4.1) |
+| `bronze.giftback.bonus_b2b_campaigns` | 1 dash | — | 🔴 Remodelar (A4.1) |
+| `bronze.giftback.bonus_b2b_logs` | 1 dash | — | 🔴 Remodelar (A4.1) |
+| `bronze.giftback.prebonus` | 1 dash | — | 🔴 Remodelar (A4.1) |
+| `bronze.giftback.prebonus_file` | 1 dash | — | 🔴 Remodelar (A4.1) |
+| `bronze.becon.*` (7 tabelas) | 1 dash (Sem Parar) | — | 🔴 Remodelar (A4.3) |
+| `bronze.presenteia.orders` | 4 MV | `silver.presenteia.tb_pedidos` ✅ | 🟢 Trocar (A2.4) |
+| `bronze.presenteia.users` | 3 MV | `silver.presenteia.tb_usuarios` ✅ | 🟢 Trocar (A2.5) |
+| `bronze.presenteia.user_events` | 5 MV | `silver.presenteia.tb_eventos` ✅ | 🟢 Trocar (A2.6) |
+| `bronze.presenteia.user_contacts` | 3 MV | `silver.presenteia.tb_conversas/entradas` ❓ | 🟡 Confirmar (A3.2) |
+| `bronze.presenteia.user_checkins` | 1 MV | — | 🔴 Remodelar (A4.4) |
+| `bronze.presenteia.user_addresses` | 1 MV | — | 🔴 Remodelar (A4.4) |
+| `bronze.presenteia.user_event_sends` | 1 MV | — | 🔴 Remodelar (A4.4) |
+| `bronze.presenteia.invite_sends` | 1 MV | — | 🔴 Remodelar (A4.4) |
+| `bronze.presenteia.meta_phone_numbers` | 1 MV | — | 🔴 Remodelar (A4.4) |
+| `bronze.presenteia.meta_template_analytics` | 1 MV | — | 🔴 Remodelar (A4.4) |
+| `bronze.valebonus.pre_charge_transaction` | 3 dash | `silver.valebonus.transactions` ❓ | 🟡 Confirmar (A3.3) |
+| `bronze.valebonus.redemptions` | 1 MV · 1 dash | `silver.valebonus.transactions` ❓ | 🟡 Confirmar (A3.4) |
+| `bronze.valebonus.users` | 1 dash | `silver.valebonus.usuarios` ❓ | 🟡 Confirmar (A3.5) |
+| `bronze.valebonus.consumer` | 1 dash | `silver.valebonus.usuarios` ❓ | 🟡 Confirmar (A3.5) |
+| `bronze.valebonus.device` | 1 dash | `silver.valebonus.usuarios` ❓ | 🟡 Confirmar (A3.5) |
+| `bronze.valebonus.session` | 1 dash | `silver.valebonus.usuarios` ❓ | 🟡 Confirmar (A3.5) |
+| `bronze.valebonus.applications` | 1 agente · 1 dash | — | 🔴 Remodelar (A4.5) |
+| `bronze.valebonus.campaign` | 1 dash | — | 🔴 Remodelar (A4.5) |
+| `bronze.valebonus.offer` | 1 dash | — | 🔴 Remodelar (A4.5) |
+| `bronze.valebonus.cellphone` | 1 dash | — | 🔴 Remodelar (A4.5) |
+| `bronze.valebonus.wallet_balances` | 1 dash | — | 🔴 Remodelar (A4.5) |
+| `bronze.valebonus.wallet_transaction` | 1 dash | — | 🔴 Remodelar (A4.5) |
+| `bronze.zendesk.organizations` | 1 MV | silver.zendesk (parcial) ❓ | 🟡 Criar silver faltante (A3.6) |
+| `datalab.valebonus.prd_ifood_embeded_resgates` | 1 agente | **MV já existe!** | 🟥 Reapontar Genie (A5 / D1) |
 
 ---
 
@@ -102,24 +139,24 @@ A camada semântica (MVs) existe e cobre boa parte das métricas, mas **18 dos 3
 > Views `gold.*.vw_*` que **aparentam ser gold mas leem silver/bronze por baixo**. Materializar como tabela gold (após as fontes do Eixo A serem promovidas).
 
 - [ ] **B1 · 🔴 P0 · `gold.giftback.vw_bonus_var_perdido`**
-  Contém `bronze.giftback.bonus` (além de silver). **Prioridade:** reescrever sem bronze (depende de A3) e materializar. Afeta `mv_bonus_perdido_master` (usado pela Clara).
+  Contém `bronze.giftback.bonus` (além de silver). **Prioridade:** reescrever sem bronze (depende de A2.1) e materializar. Afeta `mv_bonus_perdido_master` (usado pela Clara).
 
 - [ ] **B2 · 🟡 P1 · `gold.ads.vw_ads_resgate`**
   Lê `gold.ads.b2b_bonification` + `silver.giftback.bonus`. Materializar como tabela gold pura, eliminando o silver. Afeta `mv_ads_resgate`.
 
 - [ ] **B3 · 🟡 P1 · `gold.giftback.vw_bonus_var_gerado`**
-  Lê silver. Materializar após A1/A2. Afeta `mv_bonus_gerado_master`.
+  Lê silver. Materializar após A2.1/A2.2. Afeta `mv_bonus_gerado_master`.
 
 - [ ] **B4 · 🟡 P1 · `gold.giftback.vw_bonus_var_resgate_marca`**
-  Lê `silver.giftback.bonus`. Materializar após A1. Afeta `mv_bonus_resgate_marca`.
+  Lê `silver.giftback.bonus`. Materializar após A2.1. Afeta `mv_bonus_resgate_marca`.
 
 - [ ] **B5 · 🟡 P1 · `gold.giftback.vw_bonus_var_resgate`**
-  Lê silver. Materializar após A1/A2. Afeta `mv_bonus_resgate_master`.
+  Lê silver. Materializar após A2.1/A2.2. Afeta `mv_bonus_resgate_master`.
 
 - [ ] **B6 · 🟡 P1 · `gold.giftback.vw_bonus_var_vendatotal`**
-  Lê silver. Materializar após A8. Afeta `mv_bonus_vendatotal_master`.
+  Lê silver. Materializar após A2.3. Afeta `mv_bonus_vendatotal_master`.
 
-> ℹ️ Os MVs `mv_engajamento_*` são SQL/CTE direto sobre silver — **reescrever a CTE** para apontar às fontes gold quando A1/A2/A8 estiverem prontas (tratado em D8).
+> ℹ️ Os MVs `mv_engajamento_*` são SQL/CTE direto sobre silver — **reescrever a CTE** para apontar às fontes saneadas quando A2.1/A2.2/A2.3 estiverem prontas (tratado em D8).
 
 ---
 
@@ -135,14 +172,14 @@ A camada semântica (MVs) existe e cobre boa parte das métricas, mas **18 dos 3
 - [ ] **C5 · 🟡 P2 · Dimensões ADS nos MVs** — incorporar `gold.ads.cpl_cpi_cpa` (taxas CPL/CPI/CPA) como `dim_taxas` no `mv_ads_receita_ads`; `gold.ads.b2b_marca_cs` como `dim_marca`; avaliar publisher/praça de `b2b_message` como dimensão dos MVs existentes.
 
 ### 🎫 ValeBonus
-- [ ] **C6 · 🟡 P2 · `mv_valebonus_usuarios`** — a partir de `silver.valebonus.usuarios` (após A12). Hoje não há MV de usuários VB; usado por VB Insights e dashs.
+- [ ] **C6 · 🟡 P2 · `mv_valebonus_usuarios`** — a partir de `silver.valebonus.usuarios` (após consolidar o perfil VB em silver, A3.5). Hoje não há MV de usuários VB; usado por VB Insights e dashs.
 - [ ] **C7 · 🟡 P2 · MVs para fatos VB hoje soltos em gold** — avaliar criar MVs sobre `gold.valebonus.{emissions_agregado, cohort_parceiros, emissoes_unicas_mensais, emissoes_vivo_bi, pbi_VBO02_Parceiro}` usados direto em dashs sem camada semântica.
 
 ### 🎀 Presenteia
 - [ ] **C8 · 🟡 P2 · MVs de conversas/eventos para o Orion** — após Eixo A, criar MVs gold equivalentes a `silver.presenteia.{tb_conversas, tb_entradas, tb_eventos}` (hoje sem MV; Orion usa silver por falta de opção). Consolidar os MVs duplicados (`mv_pedidos`/`mv_pedidos_2`, `mv_lembretes_criados`/`_2`) numa única definição.
 
 ### 🎫 VB Insights — bronze sem MV
-- [ ] **C9 · 🔴 P2 · MV para `bronze.valebonus.applications`** — criar gold/MV equivalente (liga-se a A10) para eliminar consulta bronze do Genie.
+- [ ] **C9 · 🔴 P2 · MV para `bronze.valebonus.applications`** — criar gold/MV equivalente (liga-se a A4.5) para eliminar consulta bronze do Genie.
 
 ---
 
@@ -154,15 +191,15 @@ A camada semântica (MVs) existe e cobre boa parte das métricas, mas **18 dos 3
 - [ ] **D1 · 🔴 P0 · Reconfigurar Genie "Ifood Embedded"** — trocar `datalab.valebonus.prd_ifood_embeded_resgates` (staging não governado) por `gold.valebonus.mv_resgate_ifood_embedded`. **🚨 O MV já existe e está sendo ignorado** — mudança apenas de configuração.
 - [ ] **D2 · 🔴 P0 · Criar Genie ADS** — conectar aos 5 MVs gold prontos (`mv_ads_bonification`, `mv_ads_message`, `mv_ads_offer`, `mv_ads_resgate`, `mv_ads_receita_ads`). É a **única avenida sem Genie** e a infraestrutura já está pronta.
 - [ ] **D3 · 🟡 P1 · Restringir Genie "Clara" a só-MVs** — remover acesso direto a `silver.giftback.bonus`; forçar uso exclusivo dos 8 MVs. Garante semântica consistente em 100% das consultas.
-- [ ] **D4 · 🟡 P2 · Unificar Genie "VB Insights"** — remover `gold.valebonus.emissions` e `transactions_shops` diretos (redundantes com `mv_emissoes`/`mv_resgates`); usar só os MVs. Após A12, remover silver.
+- [ ] **D4 · 🟡 P2 · Unificar Genie "VB Insights"** — remover `gold.valebonus.emissions` e `transactions_shops` diretos (redundantes com `mv_emissoes`/`mv_resgates`); usar só os MVs. Após A3.5, remover silver.
 - [ ] **D5 · 🟡 P2 · Unificar Genie "CRMBACK Analysis"** — remover `gold.crmback.tb_carrinhos` direto; usar só `mv_carrinhos`. Padronização total.
-- [ ] **D6 · 🟡 P2 · Reapontar Genie "Orion"** — após A4–A7, migrar de `silver.presenteia.*` para os MVs gold do Presenteia.
+- [ ] **D6 · 🟡 P2 · Reapontar Genie "Orion"** — após A2.4–A2.6 / A3.2, migrar de `silver.presenteia.*` para os MVs gold do Presenteia.
 
 ### Dashboards
-- [ ] **D7 · 🟡 P1 · Migrar datasets PBI dos dashs ADS para MVs** — onde o dash usa SQL direto sobre bronze/gold (`f_ads_geral_motor`, `brand`, `Brand_Offer`, etc.), reapontar para os MVs e dims gold à medida que A15/C1–C5 ficam prontos.
+- [ ] **D7 · 🟡 P1 · Migrar datasets PBI dos dashs ADS para MVs** — onde o dash usa SQL direto sobre bronze/gold (`f_ads_geral_motor`, `brand`, `Brand_Offer`, etc.), reapontar para os MVs e dims gold à medida que A4.1/A4.2 e C1–C5 ficam prontos.
 - [ ] **D8 · 🟡 P1 · Reescrever CTEs dos MVs SQL/CTE** — `mv_engajamento_marca/master`, `mv_ads_receita_ads` e demais MVs definidos por CTE sobre silver/bronze: trocar fontes pelas tabelas gold dos Eixos A/B.
-- [ ] **D9 · 🟡 P2 · Migrar dashs Giftback para MVs/gold** — natura, vivara, cs_giftback, cs_acoes: trocar `bronze.giftback.*` (A15) e `silver.giftback.bonus` (A1) pelos MVs/dims gold.
-- [ ] **D10 · 🟡 P2 · Migrar dashs ValeBonus para MVs/gold** — parceiros_interno, vale_bonus_parceiros, vivo, vivo_acompanhamento: substituir `bronze.valebonus.*` (A9/A13) e silver pelos MVs/gold.
+- [ ] **D9 · 🟡 P2 · Migrar dashs Giftback para MVs/gold** — natura, vivara, cs_giftback, cs_acoes: trocar `bronze.giftback.bonus` (→ silver, A2.1) e os demais `bronze.giftback.*` (A4.1/A4.2) pelos MVs/dims gold.
+- [ ] **D10 · 🟡 P2 · Migrar dashs ValeBonus para MVs/gold** — parceiros_interno, vale_bonus_parceiros, vivo, vivo_acompanhamento: substituir `bronze.valebonus.pre_charge_transaction` (A3.3) e os demais `bronze.valebonus.*` (A4.5) pelos MVs/gold.
 
 ---
 
@@ -173,23 +210,25 @@ A camada semântica (MVs) existe e cobre boa parte das métricas, mas **18 dos 3
 ### 🚀 P0 — Faça primeiro (alto impacto)
 | ID | Tarefa | Tipo | Destrava |
 |---|---|---|---|
+| A1 | Inventário + verificação de silver no Unity Catalog | Verificação | define toda a decisão do Eixo A (trocar vs remodelar) |
 | D1 | Reconfigurar Ifood Embedded → MV existente | Config | 1 Genie (ganho imediato, esforço ~zero) |
 | D2 | Criar Genie ADS | Config | Fecha o único gap de cobertura por avenida |
-| A1+A2 | `silver.giftback.{bonus,masters}` → gold | Modelagem | 9/10 MVs Giftback + 4 dashs + Clara |
-| A3 | `bronze.giftback.bonus` → gold | Modelagem | 2 MVs + Clara |
-| A4+A5 | `bronze.presenteia.{orders,user_events}` → gold | Modelagem | 8 MVs Presenteia + Orion |
+| A2.1+A2.2 | `bronze.giftback.{bonus,masters}` → silver existente | Saneamento | maioria dos MVs/dashs Giftback + Clara |
+| A2.4–A2.6 | `bronze.presenteia.{orders,users,user_events}` → silver existente | Saneamento | 12 usos de MV no Presenteia + Orion |
 | B1 | Materializar `vw_bonus_var_perdido` (sem bronze) | View | `mv_bonus_perdido_master` |
 
 ### 🔧 P1 — Em seguida (consolida o ganho)
-A6, A7, A8, A9, A10, A11 · B2–B6 · C1 · D3, D7, D8
+A2.3 · A3.1, A3.2, A3.3 · A4.1, A4.5 · B2–B6 · C1 · D3, D7, D8
 
 ### 🧹 P2 — Refinamento e cauda longa
-A12–A16 · C2–C9 · D4, D5, D6, D9, D10
+A3.4, A3.5, A3.6 · A4.2, A4.3, A4.4 · C2–C9 · D4, D5, D6, D9, D10
 
 ### Dependências-chave
-- **Views (Eixo B)** dependem da promoção das fontes (Eixo A) — materializar só depois.
-- **Novos MVs Presenteia (C8)** dependem de A4–A7.
-- **Migração de dashs/Genies (D6–D10)** depende do gold correspondente já existir.
+- **A1 (verificação no catálogo) vem antes de tudo no Eixo A** — é ela que classifica cada bronze em "trocar por silver" (A2/A3) ou "remodelar" (A4).
+- **Trocas (A2/A3)** são mais baratas que remodelagens (A4) — priorizar onde a silver já existe.
+- **Views (Eixo B)** dependem do saneamento das fontes (Eixo A) — materializar só depois.
+- **Novos MVs Presenteia (C8)** dependem de A2.4–A2.6 / A3.2.
+- **Migração de dashs/Genies (D6–D10)** depende do gold/silver correspondente já existir.
 - **MV `mv_resgate_ifood_embedded`** já existe → D1 é independente do Eixo A.
 
 ---
